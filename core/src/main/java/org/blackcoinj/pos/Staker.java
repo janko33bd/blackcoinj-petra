@@ -11,7 +11,7 @@ import java.util.TreeSet;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.spongycastle.crypto.params.KeyParameter;
 import org.bitcoinj.core.AbstractBlockChain;
 import org.bitcoinj.core.AbstractBlockChainListener;
 import org.bitcoinj.core.Block;
@@ -20,6 +20,7 @@ import org.bitcoinj.core.Context;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.PeerGroup;
+import org.bitcoinj.core.PrunedException;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.Transaction;
@@ -54,14 +55,21 @@ public class Staker extends AbstractExecutionThreadService {
 	private AbstractBlockChain chain;
 	private volatile boolean newBestBlockArrived = false;
 	private volatile boolean stopStaking = false;
+	private String walletPassword;
 
 	public Staker(NetworkParameters params, PeerGroup peers, Wallet wallet, FullPrunedBlockStore store,
-			AbstractBlockChain chain) {
+			AbstractBlockChain chain, String walletPassword) {
 		this.params = params;
 		this.peers = peers;
 		this.wallet = wallet;
 		this.store = store;
 		this.chain = chain;
+		this.walletPassword = walletPassword;
+    	List<TransactionOutput> calculateAllSpendCandidates = wallet.calculateAllSpendCandidates();
+    	for(TransactionOutput txOut: calculateAllSpendCandidates){
+    		log.info(String.valueOf(txOut.getValue().value));
+    	}
+    	
 	}
 
 	private class MinerBlockChainListener extends AbstractBlockChainListener {
@@ -81,6 +89,8 @@ public class Staker extends AbstractExecutionThreadService {
 	}
 
 	MinerBlockChainListener minerBlockChainListener = new MinerBlockChainListener();
+
+	
 
 	@Override
 	protected void startUp() throws Exception {
@@ -125,7 +135,8 @@ public class Staker extends AbstractExecutionThreadService {
 		StoredBlock prevBlock = chain.getChainHead();
 		Transaction coinstakeTx = initCoinstakeTx();
 		
-		while (!stopStaking && isPastLasTime(prevBlock, coinstakeTx)) {
+		while (!stopStaking && isPastLasTime(prevBlock, coinstakeTx) ||
+			!stopStaking && isFutureTime(coinstakeTx)) {
 			Thread.sleep(BlackcoinMagic.minerMiliSleep);
 			prevBlock = chain.getChainHead();
 			coinstakeTx = initCoinstakeTx();
@@ -208,16 +219,23 @@ public class Staker extends AbstractExecutionThreadService {
 			// prevoutStake, &nBlockTime[not needed]))
 			stakeKernelHash = checkForKernel(prevBlock, difficultyTarget, stakeTxTime, candidate);
 			if (stakeKernelHash != null) {
+				Set<Transaction> transactionsToInclude = getTransactionsToInclude(prevBlock.getHeight());
+				Coin fees = getFees(transactionsToInclude);
 				log.info("kernel found");
 				Coin reward = candidate.getValue();
 				reward = reward.add(Coin.valueOf(1, 50));
+				reward = reward.add(fees);
 				log.info("reward: " + reward);
 				log.info("candidate: " + candidate.getValue());
+				log.info("fees: " +fees.getValue());
 				if(reward.isLessThan(candidate.getValue())){
 					throw new BlockStoreException("coinstake destroys money!!");
 				}
 				
-				ECKey key = findWholeKey(candidate);				
+				ECKey key = findWholeKey(candidate);
+				if(key == null)
+					continue;
+				
 				Script keyScript = new ScriptBuilder().data(key.getPubKey()).op(OP_CHECKSIG).build();
 				
 				coinstakeTx.addOutput(reward, keyScript);
@@ -238,26 +256,41 @@ public class Staker extends AbstractExecutionThreadService {
 						coinstakeTx.getnTime(), difficultyTarget);
 				newBlock.addTransaction(coinbaseTransaction);
 				newBlock.addTransaction(coinstakeTx);
-				// for (Transaction transaction :
-				// blackStake.getTransactionsToInclude()) {
-				// newBlock.addTransaction(transaction);
-				// }
-				ECKey duplicateKey = ECKey.fromPrivate(key.getPrivKeyBytes());
-				log.info("new block in priv?" + duplicateKey.hasPrivKey());
-				byte[] blockSignature = duplicateKey.signReversed(newBlock.getHash()).encodeToDER();
+				for (Transaction transaction : transactionsToInclude) {
+					newBlock.addTransaction(transaction);
+				}
+				
+				byte[] blockSignature = key.signReversed(newBlock.getHash()).encodeToDER();
 
 				newBlock.setSignature(blockSignature);
-
+				
 				log.info("broadcasting: " + newBlock.getHash());
 				peers.broadcastMinedBlock(newBlock);
+				
+				try {
+					chain.add(newBlock);
+				} catch (VerificationException verExc) {
+					throw new RuntimeException(verExc);
+				} catch (PrunedException prunExc) {
+					throw new RuntimeException(prunExc);
+				}
+				
 				log.info("Sent mined block: " + newBlock.getHash());
 				log.info("blocktime " + newBlock.getTimeSeconds());
 				log.info("coinstakeTx " + coinstakeTx.getnTime());
-				newBestBlockArrived = true;
 				break;
+				
 			}
 
 		}
+	}
+
+	private Coin getFees(Set<Transaction> transactionsToInclude) {
+		Coin fees = Coin.ZERO;
+		for(Transaction tx:transactionsToInclude){
+			fees = fees.add(tx.getFee());
+		}
+		return fees;
 	}
 
 	private void checkCoinStake(Transaction coinstakeTx, Coin reward) throws BlockStoreException {
@@ -271,16 +304,17 @@ public class Staker extends AbstractExecutionThreadService {
 	}
 
 	private ECKey findWholeKey(TransactionOutput candidate) throws BlockStoreException {
-		ECKey halfkey = wallet.findKeyFromPubHash(candidate.getScriptPubKey().getPubKeyHash());
-		List<ECKey> issuedReceiveKeys = wallet.getIssuedReceiveKeys();
-		for (ECKey wholeKey : issuedReceiveKeys) {
-			if (halfkey.getPublicKeyAsHex().equals(wholeKey.getPublicKeyAsHex())) {
-				log.info("priv?" + wholeKey.hasPrivKey());
-				return wholeKey;
+		ECKey wholeKey = wallet.findKeyFromPubHash(candidate.getScriptPubKey().getPubKeyHash());
+		if (wholeKey!=null) {
+			if(wholeKey.getKeyCrypter() != null){
+				log.info("decrypting");
+	            KeyParameter aesKey = wholeKey.getKeyCrypter().deriveKey(walletPassword);
+	            return wholeKey.decrypt(aesKey);
 			}
-
-		}
-		throw new BlockStoreException("No whole key found..");
+			return wholeKey;
+		}  
+		log.info("no key found");
+		return wholeKey;
 	}
 
 	private Sha256Hash checkForKernel(StoredBlock prevBlock, long difficultyTarget, long stakeTxTime,

@@ -133,7 +133,6 @@ public abstract class NetworkParameters implements Serializable {
         genesisBlock.setNonce(BlackcoinMagic.nonce);
         genesisBlock.setDifficultyTarget(BlackcoinMagic.genesisDifficultyTarget);
         genesisBlock.setMerkleRoot(Sha256Hash.wrap(BlackcoinMagic.genesisMerkleRootHashString));
-        genesisBlock.setStakeModifier(0l);
         genesisBlock.setStakeModifier2(Sha256Hash.ZERO_HASH);
         genesisBlock.setEntropyBit(genesisBlock.getHash().toBigInteger().and(BigInteger.ONE).longValue());
         genesisBlock.setGeneratedStakeModifier(true);

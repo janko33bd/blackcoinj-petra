@@ -84,9 +84,7 @@ public class Block extends Message {
     private long nonce;
     
     // stake ingredients
-    private Sha256Hash nextBlockHash;
     private Sha256Hash stakeHashProof;
-    private long stakeModifier;
     private Sha256Hash stakeModifier2;
     private long entropyBit;
 	private boolean generatedStakeModifier;
@@ -593,7 +591,6 @@ public class Block extends Message {
     /** Copy the block without transactions into the provided empty block. */
     protected final void copyBitcoinHeaderTo(final Block block) {
     	block.entropyBit = entropyBit;
-    	block.stakeModifier = stakeModifier;
     	block.stakeModifier2 = stakeModifier2;
     	block.generatedStakeModifier = generatedStakeModifier;
     	if(stakeHashProof!=null)
@@ -1133,14 +1130,6 @@ public class Block extends Message {
     	}
     	
 	}
-    
-    public Sha256Hash getNextBlockHash() {
-		return nextBlockHash;
-	}
-
-	public void setNextBlockHash(Sha256Hash nextBlockHash) {
-		this.nextBlockHash = nextBlockHash;
-	}
 
 	public Sha256Hash getStakeHashProof() {
 		return stakeHashProof;
@@ -1148,14 +1137,6 @@ public class Block extends Message {
 
 	public void setStakeHashProof(Sha256Hash stakeHashProof) {
 		this.stakeHashProof = stakeHashProof;
-	}
-	
-	public long getStakeModifier() {
-		return stakeModifier;
-	}
-
-	public void setStakeModifier(long stakeModifier) {
-		this.stakeModifier = stakeModifier;
 	}
 	
 	public Sha256Hash getStakeModifier2() {

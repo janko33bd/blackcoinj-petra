@@ -2074,7 +2074,7 @@ public class PeerGroup implements TransactionBroadcaster {
     }*/
     
     public BlockBroadcast broadcastMinedBlock(org.bitcoinj.core.Block newBlock) {
-		return broadcastMinedBlock(newBlock, Math.max(1, getMinBroadcastConnections()));
+    	return broadcastMinedBlock(newBlock, Math.max(1, getMinBroadcastConnections()));
 		
 	}
     

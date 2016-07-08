@@ -74,7 +74,6 @@ public class BlackcoinPOS {
 	public Sha256Hash checkStakeKernelHash(StoredBlock storedPrev, long target, UTXO txPrev, long stakeTxTime,
 			TransactionOutPoint prevout) throws BlockStoreException {
 
-		StoredBlock blockFrom = null;
 		// nTimeTx < txPrev.nTime
 		if (stakeTxTime < txPrev.getTxTime())
 			throw new VerificationException("Time violation");
@@ -98,11 +97,8 @@ public class BlackcoinPOS {
 		BigInteger targetPerCoinDay = Utils.decodeCompactBits(target).multiply(BigInteger.valueOf(weight));
 
 		Sha256Hash hashProofOfStake = Sha256Hash.ZERO_HASH;
-		long stakeModifier = storedPrev.getHeader().getStakeModifier();
 		Sha256Hash stakeModifier2 = storedPrev.getHeader().getStakeModifier2();
 		byte[] arrayHashPrevout = prevout.getHash().getBytes();
-		byte[] arStakeMod = new byte[8];
-		Utils.uint64ToByteArrayLE(stakeModifier, arStakeMod, 0);
 		ByteArrayOutputStream ssStakeStream;
 		try {
 			if (stakeTxTime > BlackcoinMagic.txTimeProtocolV3) {

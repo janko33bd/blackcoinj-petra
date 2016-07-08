@@ -23,8 +23,11 @@ import org.bitcoinj.core.UTXOProviderException;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.FullPrunedBlockStore;
 import org.blackcoinj.pos.BlackcoinMagic;
+import org.fusesource.leveldbjni.JniDBFactory;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
+import org.iq80.leveldb.DB;
+import org.iq80.leveldb.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,20 +86,33 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 		if(wholeMap == null)
 			throw new BlockStoreException("Couldn't read the file");
 		
-		//createh2MvStore(wholeMap);
+		createh2MvStore(wholeMap);
 	}
 
 	private void createh2MvStore(Map<ByteArrayWrapper, byte[]> wholeMap2) {
-		MVStore store = new MVStore.Builder().autoCommitDisabled().compressHigh().fileName("h2chain").open();
-		store.setReuseSpace(true);
-		store.setStoreVersion(0);
-		store.setVersionsToKeep(0);
-		MVMap<byte[], byte[]> otherMap = store.openMap("ALL");
-		Set<ByteArrayWrapper> keySet = wholeMap.keySet();
-		for(ByteArrayWrapper key:keySet){
-			otherMap.put(key.data, wholeMap.get(key));
+		File leveldbstore = new File("C:/MY/blackcoinj/latest/projects/multibithd/leveldb");
+		
+		if(!leveldbstore.exists()){
+			Options options = new Options();
+			options.createIfMissing(true);
+			
+			DB store = null;
+			try {
+				store = JniDBFactory.factory.open(leveldbstore, options);
+			} catch (IOException e) {
+				
+			}
+			Set<ByteArrayWrapper> keySet = wholeMap.keySet();
+			for(ByteArrayWrapper key:keySet){
+				store.put(key.data, wholeMap.get(key));
+			}
+			try {
+				store.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
-		store.close();
 		
 	}
 
@@ -233,27 +249,27 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 
 	@Override
 	public void put(StoredBlock storedBlock, StoredUndoableBlock undoableBlock) throws BlockStoreException {
-		Sha256Hash hash = storedBlock.getHeader().getHash();
-		if (!hash.equals(Sha256Hash.wrap(BlackcoinMagic.checkpoint0)))
-			updatePrevWithNextBlock(storedBlock, undoableBlock);
+//		Sha256Hash hash = storedBlock.getHeader().getHash();
+//		if (!hash.equals(Sha256Hash.wrap(BlackcoinMagic.checkpoint0)))
+//			updatePrevWithNextBlock(storedBlock, undoableBlock);
 		
 		insertOrUpdate(storedBlock, undoableBlock);
 		
 	}
 
-	private void updatePrevWithNextBlock(StoredBlock storedBlock, StoredUndoableBlock undoableBlock)
-			throws BlockStoreException {
-		StoredBlock prevBlock = get(storedBlock.getHeader().getPrevBlockHash());
-		if (Sha256Hash.ZERO_HASH.equals(prevBlock.getHeader().getNextBlockHash())
-				|| prevBlock.getHeader().getNextBlockHash() == null) {
-			Sha256Hash prevBlockHash = prevBlock.getHeader().getHash();
-			byte[] byteBlock = wholeMap.get(new ByteArrayWrapper(prevBlockHash.getBytes()));
-			BlackBlock blackBlock = new BlackBlock(params, byteBlock);
-			blackBlock.block.getHeader().setNextBlockHash(storedBlock.getHeader().getHash());
-			wholeMap.put(new ByteArrayWrapper(prevBlockHash.getBytes()), blackBlock.toByteArray());
-		}
-
-	}
+//	private void updatePrevWithNextBlock(StoredBlock storedBlock, StoredUndoableBlock undoableBlock)
+//			throws BlockStoreException {
+//		StoredBlock prevBlock = get(storedBlock.getHeader().getPrevBlockHash());
+//		if (Sha256Hash.ZERO_HASH.equals(prevBlock.getHeader().getNextBlockHash())
+//				|| prevBlock.getHeader().getNextBlockHash() == null) {
+//			Sha256Hash prevBlockHash = prevBlock.getHeader().getHash();
+//			byte[] byteBlock = wholeMap.get(new ByteArrayWrapper(prevBlockHash.getBytes()));
+//			BlackBlock blackBlock = new BlackBlock(params, byteBlock);
+//			blackBlock.block.getHeader().setNextBlockHash(storedBlock.getHeader().getHash());
+//			wholeMap.put(new ByteArrayWrapper(prevBlockHash.getBytes()), blackBlock.toByteArray());
+//		}
+//
+//	}
 
 	@Override
 	public StoredBlock getOnceUndoableStoredBlock(Sha256Hash hash) throws BlockStoreException {
@@ -334,25 +350,13 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 		}
 	}
 
-	@Override
-	public void setTheLast(Sha256Hash theLast) {
-		this.theLast = theLast;
-		wholeMap.put(new ByteArrayWrapper(THE_LAST.getBytes()), this.theLast.getBytes());
-	}
 
 	private void removeAll() throws BlockStoreException {
 		byte[] byteBlock = wholeMap.get(new ByteArrayWrapper(this.theLast.getBytes()));
 		BlackBlock flagedBlock = new BlackBlock(params, byteBlock);
 		wholeMap.remove(this.theLast.getBytes());
-		setTheLast(flagedBlock.block.getHeader().getNextBlockHash());
 	}
 
-	@Override
-	public void putCheckPointed(StoredBlock block) throws BlockStoreException {
-		Sha256Hash hash = block.getHeader().getHash();
-		BlackBlock blackBlock = new BlackBlock(block, true, null, null);
-		wholeMap.put(new ByteArrayWrapper(hash.getBytes()), blackBlock.toByteArray());
-	}
 
 	@Override
 	public void beginDatabaseBatchWrite() throws BlockStoreException {

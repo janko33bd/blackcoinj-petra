@@ -90,6 +90,8 @@ public class BlackcoinMagic {
 	public static final long minerMiliSleep = 500;
 
 	public static final int spliStakeLimitCoins = 200;
+	
+	public static final int blockTime = 64;
 
 	
 }
