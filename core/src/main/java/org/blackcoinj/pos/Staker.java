@@ -135,29 +135,25 @@ public class Staker extends AbstractExecutionThreadService {
 		StoredBlock prevBlock = chain.getChainHead();
 		Transaction coinstakeTx = initCoinstakeTx();
 		
-		while (!stopStaking && !newBestBlockArrived) {
+		while (!stopStaking && !newBestBlockArrived
+			&& isPastLasTime(prevBlock, coinstakeTx) && isFutureTime(coinstakeTx)){
+					
 			Thread.sleep(BlackcoinMagic.minerMiliSleep);
 			prevBlock = chain.getChainHead();
 			coinstakeTx = initCoinstakeTx();
-			if (!isPastLasTime(prevBlock, coinstakeTx) &&
-				!isFutureTime(coinstakeTx))
-					break;			
-		}
-		
-		if (!newBestBlockArrived){
-			log.info("good times :)");
-			log.info("do stake");
+						
 		}
 
-		while (!stopStaking && !newBestBlockArrived) {
+		while(!stopStaking && !newBestBlockArrived) {
 			doStake(prevBlock, coinstakeTx);
 			Thread.sleep(BlackcoinMagic.minerMiliSleep);
-			prevBlock = chain.getChainHead();
 			coinstakeTx = initCoinstakeTx();
 			if (isPastLasTime(prevBlock, coinstakeTx))
 				break;
+				
 			if (isFutureTime(coinstakeTx))
 				break;
+							
 		}
 		
 		if (newBestBlockArrived){
