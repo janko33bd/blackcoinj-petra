@@ -135,11 +135,13 @@ public class Staker extends AbstractExecutionThreadService {
 		StoredBlock prevBlock = chain.getChainHead();
 		Transaction coinstakeTx = initCoinstakeTx();
 		
-		while (!stopStaking && isPastLasTime(prevBlock, coinstakeTx) ||
-			!stopStaking && isFutureTime(coinstakeTx)) {
+		while (!stopStaking && !newBestBlockArrived) {
 			Thread.sleep(BlackcoinMagic.minerMiliSleep);
 			prevBlock = chain.getChainHead();
 			coinstakeTx = initCoinstakeTx();
+			if (!isPastLasTime(prevBlock, coinstakeTx) &&
+				!isFutureTime(coinstakeTx))
+					break;			
 		}
 		
 		if (!newBestBlockArrived){
@@ -150,14 +152,18 @@ public class Staker extends AbstractExecutionThreadService {
 		while (!stopStaking && !newBestBlockArrived) {
 			doStake(prevBlock, coinstakeTx);
 			Thread.sleep(BlackcoinMagic.minerMiliSleep);
+			prevBlock = chain.getChainHead();
 			coinstakeTx = initCoinstakeTx();
 			if (isPastLasTime(prevBlock, coinstakeTx))
 				break;
 			if (isFutureTime(coinstakeTx))
 				break;
 		}
-
-		log.info("block arrived");
+		
+		if (newBestBlockArrived){
+			log.info("block arrived");
+		}
+		
 
 	}
 
@@ -304,7 +310,7 @@ public class Staker extends AbstractExecutionThreadService {
 	}
 
 	private ECKey findWholeKey(TransactionOutput candidate) throws BlockStoreException {
-		ECKey wholeKey = wallet.findKeyFromPubHash(candidate.getScriptPubKey().getPubKeyHash());
+		ECKey wholeKey = wallet.findKeyFromPubKey(candidate.getScriptPubKey().getPubKey());
 		if (wholeKey!=null) {
 			if(wholeKey.getKeyCrypter() != null){
 				log.info("decrypting");
