@@ -239,10 +239,9 @@ public class Staker extends AbstractExecutionThreadService {
 					continue;
 				
 				Script keyScript = new ScriptBuilder().data(key.getPubKey()).op(OP_CHECKSIG).build();
-				
-				coinstakeTx.addOutput(reward, keyScript);
-				checkArgument(coinstakeTx.getOutputs().size() == 2);
+				addCoinstakeOutput(coinstakeTx, reward, keyScript);
 				checkCoinStake(coinstakeTx, reward);
+				
 				coinstakeTx.addSignedInput(candidate, key);
 				try {
 					coinstakeTx.verify();
@@ -285,6 +284,19 @@ public class Staker extends AbstractExecutionThreadService {
 			}
 
 		}
+	}
+
+	private void addCoinstakeOutput(Transaction coinstakeTx, Coin reward, Script keyScript) {
+		if (reward.isGreaterThan(Coin.valueOf(BlackcoinMagic.spliStakeLimitCoins, 0))) {
+			long split = reward.value / 2;
+			coinstakeTx.addOutput(Coin.valueOf(split), keyScript);
+			coinstakeTx.addOutput(Coin.valueOf(reward.value - split), keyScript);
+			checkArgument(coinstakeTx.getOutputs().size() == 3);
+		} else {
+			coinstakeTx.addOutput(reward, keyScript);
+			checkArgument(coinstakeTx.getOutputs().size() == 2);
+		}
+
 	}
 
 	private Coin getFees(Set<Transaction> transactionsToInclude) {
