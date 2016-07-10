@@ -671,9 +671,11 @@ public abstract class AbstractBlockChain {
         log.info("Split at block: {}", foundCrack.getHeader().getHashAsString());
         //in blackcoin it happens that split and head is the same
         if (head.getHeight() == foundCrack.getHeight())
-        	splitPoint = foundCrack.getPrev(blockStore);
-        else
-        	splitPoint = foundCrack;
+        	foundCrack = foundCrack.getPrev(blockStore);
+        // go one deeper, in case the block is your staked block
+        foundCrack = foundCrack.getPrev(blockStore);
+        
+        splitPoint = foundCrack;
         // Then build a list of all blocks in the old part of the chain and the new part.
         final LinkedList<StoredBlock> oldBlocks = getPartialChain(head, splitPoint, blockStore);
         final LinkedList<StoredBlock> newBlocks = getPartialChain(newChainHead, splitPoint, blockStore);

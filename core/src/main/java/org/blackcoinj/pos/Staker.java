@@ -306,7 +306,15 @@ public class Staker extends AbstractExecutionThreadService {
 	}
 
 	private ECKey findWholeKey(TransactionOutput candidate) throws BlockStoreException {
-		ECKey wholeKey = wallet.findKeyFromPubKey(candidate.getScriptPubKey().getPubKey());
+		ECKey wholeKey = null;
+		try{
+			byte[] patternBytes = candidate.getScriptPubKey().getPubKey();
+			wholeKey = wallet.findKeyFromPubKey(patternBytes);
+		}catch(Exception ex){
+			byte[] patternBytes = candidate.getScriptPubKey().getPubKeyHash();
+			wholeKey = wallet.findKeyFromPubHash(patternBytes);
+		}
+		
 		if (wholeKey!=null) {
 			if(wholeKey.getKeyCrypter() != null){
 				log.info("decrypting");
