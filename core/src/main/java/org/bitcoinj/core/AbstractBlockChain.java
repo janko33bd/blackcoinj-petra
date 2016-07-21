@@ -432,7 +432,7 @@ public abstract class AbstractBlockChain {
         }
     }
 
-    private void setCheckBlackCoinStake(StoredBlock storedPrev, Block newBlock) throws BlockStoreException{
+    private void setCheckBlackCoinStake(StoredBlock storedPrev, Block newBlock) throws BlockStoreException, VerificationException{
     	if(newBlock.getPrevBlockHash().equals(storedPrev.getHeader().getHash())){
 			this.blackStake.setBlackCoinStake(storedPrev, newBlock);
 			Sha256Hash stakeHashProof = checkAndSetPOS(storedPrev, newBlock);
@@ -444,7 +444,7 @@ public abstract class AbstractBlockChain {
 	/**
      * This method has to be overridden in FullPrunedBlockChain cause we need transactions to verify POS.
      */
-    protected Sha256Hash checkAndSetPOS(StoredBlock storedPrev, Block block) throws BlockStoreException {
+    protected Sha256Hash checkAndSetPOS(StoredBlock storedPrev, Block block) throws BlockStoreException, VerificationException {
 		throw new RuntimeException("forgot to override method AbstractBlockChain.checkAndSetPOS");
 	}
 

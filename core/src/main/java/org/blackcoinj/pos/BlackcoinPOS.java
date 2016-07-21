@@ -28,11 +28,11 @@ public class BlackcoinPOS {
 		this.blockStore = blockStore;
 	}
 
-	public Sha256Hash checkAndSetPOS(StoredBlock storedPrev, Block newBlock) throws BlockStoreException {
+	public Sha256Hash checkAndSetPOS(StoredBlock storedPrev, Block newBlock) throws BlockStoreException, VerificationException {
 		return checkSetBlackCoinPOS(storedPrev, newBlock);
 	}
 
-	private Sha256Hash checkSetBlackCoinPOS(StoredBlock storedPrev, Block block) throws BlockStoreException {
+	private Sha256Hash checkSetBlackCoinPOS(StoredBlock storedPrev, Block block) throws BlockStoreException, VerificationException {
 
 		// log.info("checkinng proof of stake");
 		List<Transaction> transactions = block.getTransactions();
@@ -52,14 +52,15 @@ public class BlackcoinPOS {
 	}
 
 	private Sha256Hash checkProofOfStake(StoredBlock storedPrev, Transaction stakeTx, long target)
-			throws BlockStoreException {
+			throws BlockStoreException, VerificationException {
 		// Kernel (input 0) must match the stake hash target per coin age
 		// (nBits)
 		TransactionInput txin = stakeTx.getInputs().get(0);
 		// https://github.com/rat4/blackcoin/blob/a2e518d59d8cded7c3e0acf1f4a0d9b363b46346/src/kernel.cpp#L427
 		// First try finding the previous transaction in database
 		UTXO txPrev = blockStore.getTransactionOutput(txin.getOutpoint().getHash(), txin.getOutpoint().getIndex());
-
+		if (txPrev == null)
+			throw new BlockStoreException("utxo not found");
 		// CheckStakeKernelHash(pindexPrev, nBits, block, txindex.pos.nTxPos -
 		// txindex.pos.nBlockPos, txPrev,
 		// txin.prevout, tx.nTime, hashProofOfStake, targetProofOfStake,
@@ -72,7 +73,7 @@ public class BlackcoinPOS {
 	}
 
 	public Sha256Hash checkStakeKernelHash(StoredBlock storedPrev, long target, UTXO txPrev, long stakeTxTime,
-			TransactionOutPoint prevout) throws BlockStoreException {
+			TransactionOutPoint prevout) throws BlockStoreException, VerificationException {
 
 		// nTimeTx < txPrev.nTime
 		if (stakeTxTime < txPrev.getTxTime())
@@ -80,9 +81,7 @@ public class BlackcoinPOS {
 		// https://github.com/rat4/blackcoin/blob/e1b26651752c2a90e8cc42005e27bae7e1544622/src/kernel.cpp#L435
 		if (stakeTxTime > BlackcoinMagic.txTimeProtocolV3) {
 			int nDepth = 0;
-			if (IsConfirmedInNPrevBlocks(txPrev, storedPrev, BlackcoinMagic.stakeMinConfirmations - 1, nDepth))
-				throw new VerificationException(
-						"CheckProofOfStake() : tried to stake at depth " + String.valueOf(nDepth + 1));
+			
 
 		} else {
 			throw new VerificationException("Wrong chain!");
@@ -130,11 +129,6 @@ public class BlackcoinPOS {
 
 		}
 		return hashProofOfStake;
-	}
-
-	private boolean IsConfirmedInNPrevBlocks(UTXO txPrev, StoredBlock storedPrev, int i, int nDepth) {
-		// TODO NOT USEFULL NOW STAKING NOT IMPLEMENTED
-		return false;
 	}
 
 }

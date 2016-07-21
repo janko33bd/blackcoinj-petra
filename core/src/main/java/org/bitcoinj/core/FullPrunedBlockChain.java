@@ -535,7 +535,7 @@ public class FullPrunedBlockChain extends AbstractBlockChain {
     }
     
     @Override
-	protected Sha256Hash checkAndSetPOS(StoredBlock storedPrev, Block block) throws BlockStoreException{
+	protected Sha256Hash checkAndSetPOS(StoredBlock storedPrev, Block block) throws BlockStoreException, VerificationException{
 		return blackPOS.checkAndSetPOS(storedPrev, block);
 	}
 }
