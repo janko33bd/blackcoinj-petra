@@ -268,6 +268,10 @@ public class Staker extends AbstractExecutionThreadService {
 				log.info("broadcasting: " + newBlock.getHash());
 				peers.broadcastMinedBlock(newBlock);
 				
+				log.info("isMine: " + newBlock.isMine());
+				newBlock.setMine(true);
+				log.info("isMine: " + newBlock.isMine());
+				
 				try {
 					chain.add(newBlock);
 				} catch (VerificationException verExc) {

@@ -45,6 +45,7 @@ public class H2MVStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 		store.setReuseSpace(true);
 		store.setStoreVersion(0);
 		wholeMap = store.openMap("ALL");
+		
 		initStore();
 		started = Utils.currentTimeSeconds();
 	}
@@ -133,8 +134,7 @@ public class H2MVStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 	@Override
 	public List<UTXO> getOpenTransactionOutputs(List<Address> addresses) throws UTXOProviderException {
 		List<UTXO> foundOutputs = new ArrayList<UTXO>();
-		List<byte[]> outputsList = new ArrayList<byte[]>(wholeMap.values());
-		for (byte[] output : outputsList) {
+		for (byte[] output : wholeMap.values()) {
 			if(output[0] == 1){
 				continue;
 			}	

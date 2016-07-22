@@ -32,9 +32,16 @@ public class BlackBlock {
 	public BlackBlock(NetworkParameters params, byte[] byteArray) throws BlockStoreException{
 		ByteBuffer buffer = ByteBuffer.wrap(byteArray);
 		byte[] identifyFlag = new byte[1];
+		byte[] mine = new byte[1];
     	buffer.get(identifyFlag);
+    	buffer.get(mine);
+		
     	this.block = StoredBlock.deserializeBlkCompact(params, buffer);
-    	
+    	if (mine[0] == 1)
+			this.block.getHeader().setMine(true);
+		else
+			this.block.getHeader().setMine(false);
+		
     	byte undo = buffer.get();
 		if (undo == 1)
 			this.wasUndoable = true;
@@ -59,7 +66,7 @@ public class BlackBlock {
             this.transactions = extractTxList(params, txBytes);
 		}
 	}
-
+	
 	private List<Transaction> extractTxList(NetworkParameters params, byte[] txBytes) {
 		int offset = 0;
 		int numTxn = ((txBytes[offset++] & 0xFF)) |
@@ -101,12 +108,17 @@ public class BlackBlock {
 		}
 		//tx or txOUT?
 		// now we know
-		ByteBuffer buffer = ByteBuffer.allocate(1 + StoredBlock.COMPACT_SERIALIZED_BLK_SIZE + 1 + 1 +(txOutBytes!=null?txOutBytes.length:0) );
+		ByteBuffer buffer = ByteBuffer.allocate(1 + 1 + StoredBlock.COMPACT_SERIALIZED_BLK_SIZE + 1 + 1 +(txOutBytes!=null?txOutBytes.length:0) );
 		
-		//identifyFlag(1) + storedBlock(218) + wasUndoable(1) + txOrTxOut(1) + txOutBytes(variable)
+		//identifyFlag(1) + isMineFlag(1) + storedBlock(169) + wasUndoable(1) + txOrTxOut(1) + txOutBytes(variable)
 		//identify flag 1
 		byte[] identifyFlag = new byte[] { (byte)1};        
     	buffer.put(identifyFlag);
+    	
+    	if (block.getHeader().isMine())
+			buffer.put((byte) 1);
+		else
+			buffer.put((byte) 0);
 		// stored block
     	block.serializeBlkCompact(buffer);
 		// undoable
