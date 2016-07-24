@@ -672,10 +672,6 @@ public abstract class AbstractBlockChain {
         //in blackcoin it happens that split and head is the same
         if (head.getHeight() == foundCrack.getHeight())
         	foundCrack = foundCrack.getPrev(blockStore);
-        // go deeper, in case the block is mine staked block
-        if (head.getHeader().isMine())
-        	foundCrack = foundCrack.getPrev(blockStore);
-        
         
         splitPoint = foundCrack;
         // Then build a list of all blocks in the old part of the chain and the new part.
@@ -738,7 +734,7 @@ public abstract class AbstractBlockChain {
         setChainHead(storedNewHead);
     }
 
-    /**
+	/**
      * Returns the set of contiguous blocks between 'higher' and 'lower'. Higher is included, lower is not.
      */
     private static LinkedList<StoredBlock> getPartialChain(StoredBlock higher, StoredBlock lower, BlockStore store) throws BlockStoreException {

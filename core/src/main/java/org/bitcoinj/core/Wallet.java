@@ -39,7 +39,6 @@ import org.bitcoinj.wallet.Protos.Wallet.*;
 import org.bitcoinj.wallet.WalletTransaction.*;
 import org.slf4j.*;
 import org.spongycastle.crypto.params.*;
-
 import javax.annotation.*;
 import java.io.*;
 import java.util.*;
@@ -5010,6 +5009,19 @@ public class Wallet extends BaseTaggableObject implements Serializable, BlockCha
         } finally {
             lock.unlock();
         }
+    }
+    
+    public void restoreOuts(Transaction coinstakeTx, TransactionOutput out){    	
+    	List<TransactionOutput>  stakedOutputs = coinstakeTx.getOutputs();
+    	log.info("removing " + stakedOutputs.size());
+		for(TransactionOutput stakedOut:stakedOutputs){
+			log.info(String.valueOf(stakedOut.getValue()));
+    		myUnspents.remove(stakedOut);    		
+    	}
+    	myUnspents.add(out);
+    	List<Transaction> killedTx = new ArrayList<Transaction>();
+    	killedTx.add(coinstakeTx);
+		killTx(null, killedTx);
     }
     //endregion
   
