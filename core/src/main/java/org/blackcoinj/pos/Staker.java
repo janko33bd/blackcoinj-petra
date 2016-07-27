@@ -88,18 +88,23 @@ public class Staker extends AbstractExecutionThreadService {
 		@Override
 		public void reorganize(StoredBlock splitPoint, List<StoredBlock> oldBlocks, List<StoredBlock> newBlocks)
 				throws VerificationException {
-			log.info("reorg");
-			newBestBlockArrived = true;
+			log.info("reorg");			
 			try {
 				ifMineAddUtxo(oldBlocks);
 			} catch (BlockStoreException e) {
 				throw new VerificationException(e);
 			}
+			newBestBlockArrived = true;
 		}
 
 		private void ifMineAddUtxo(List<StoredBlock> oldBlocks) throws BlockStoreException {
 			for (StoredBlock block : oldBlocks) {
-				if (block.getHeader().isMine()) {
+				log.info("old block " + block.getHeader().getHashAsString());
+				log.info("mine? " + block.getHeader().isMine());
+				for(Sha256Hash hash: stakedOuts.keySet()){
+					log.info(hash.toString());
+				}
+				if (block.getHeader().isMine() || stakedOuts.get(block.getHeader().getHash()) != null ) {
 					log.info("is mine restoring.. ");
 					RestoreUTXOut utxoOut = getStakedUtxoOut(block.getHeader().getHash());
 					wallet.restoreOuts(utxoOut.getCoinstakeTx(), utxoOut.getOut());

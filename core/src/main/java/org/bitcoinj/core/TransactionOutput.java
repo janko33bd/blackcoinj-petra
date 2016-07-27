@@ -447,4 +447,9 @@ public class TransactionOutput extends ChildMessage implements Serializable {
             result *= parent.getHash().hashCode() + getIndex();
         return result;
     }
+
+	public boolean isNull() {
+		 maybeParse();
+		 return value == -1;
+	}
 }

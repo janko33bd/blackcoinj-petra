@@ -20,14 +20,13 @@ import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.StoredUndoableBlock;
 import org.bitcoinj.core.UTXO;
 import org.bitcoinj.core.UTXOProviderException;
+import org.bitcoinj.core.Utils;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.FullPrunedBlockStore;
 import org.blackcoinj.pos.BlackcoinMagic;
 import org.fusesource.leveldbjni.JniDBFactory;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
-import org.iq80.leveldb.DB;
-import org.iq80.leveldb.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,16 +42,16 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 	private StoredBlock chainHead;
 	private NetworkParameters params;
 	private StoredBlock verifiedChainHead;
-	private Sha256Hash theLast;
 
 	private final String CHAINHEAD = "CHAINHEAD";
 	private final String VERIFIED_CHAINHEAD = "VERIFIED_CHAINHEAD";
-	private final String THE_LAST = "THE_LAST";
 
 	private Kryo kryo;
 	private final String dbname;
 
 	private MapSerializer serializer;
+
+	private final long started;
 
 	
 
@@ -65,8 +64,24 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 		serializer.setKeyClass(ByteArrayWrapper.class, kryo.getSerializer(ByteArrayWrapper.class));
 		serializer.setKeysCanBeNull(false);
 		serializer.setValueClass(byte[].class, kryo.getSerializer(byte[].class));
+		started = Utils.currentTimeSeconds();
+		loadFromH2MVStore();
 		initMap(kryo, dbName);
 		initStore();
+	}
+
+	private void loadFromH2MVStore() throws BlockStoreException {
+		
+		MVStore  store = new MVStore.Builder().autoCommitDisabled().compressHigh().fileName("").open();
+		store.setReuseSpace(true);
+		store.setStoreVersion(0);
+		MVMap<byte[], byte[]> mvstoreMap = store.openMap("ALL");
+		wholeMap =  new HashMap<ByteArrayWrapper, byte[]>();
+		for(byte[] key: mvstoreMap.keyList()){
+			wholeMap.put(new ByteArrayWrapper(key), mvstoreMap.get(key));
+		}
+		serializeTofile(wholeMap);
+		System.exit(0);
 	}
 
 	private void initMap(Kryo kryo, String dbName) throws BlockStoreException {
@@ -85,46 +100,11 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 		
 		if(wholeMap == null)
 			throw new BlockStoreException("Couldn't read the file");
-		
-		createh2MvStore(wholeMap);
-	}
-
-	private void createh2MvStore(Map<ByteArrayWrapper, byte[]> wholeMap2) {
-		File leveldbstore = new File("C:/MY/blackcoinj/latest/projects/multibithd/leveldb");
-		
-		if(!leveldbstore.exists()){
-			Options options = new Options();
-			options.createIfMissing(true);
-			
-			DB store = null;
-			try {
-				store = JniDBFactory.factory.open(leveldbstore, options);
-			} catch (IOException e) {
-				
-			}
-			Set<ByteArrayWrapper> keySet = wholeMap.keySet();
-			for(ByteArrayWrapper key:keySet){
-				store.put(key.data, wholeMap.get(key));
-			}
-			try {
-				store.close();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-		
 	}
 
 	private void initStore() throws BlockStoreException {
 		byte[] verifiedChainHeadbytes = wholeMap.get(new ByteArrayWrapper(VERIFIED_CHAINHEAD.getBytes()));
 		byte[] chainHeadbytes = wholeMap.get(new ByteArrayWrapper(CHAINHEAD.getBytes()));
-		byte[] lastBytes = wholeMap.get(new ByteArrayWrapper(THE_LAST.getBytes()));
-		if (lastBytes != null) {
-			this.theLast = Sha256Hash.wrap(lastBytes);
-			log.info("setting to " + this.theLast.toString());
-		} else
-			log.info("not set");
 
 		if (verifiedChainHeadbytes != null) {
 			Sha256Hash hash = Sha256Hash.wrap(verifiedChainHeadbytes);
@@ -191,6 +171,8 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 
 	@Override
 	public void close() throws BlockStoreException {
+		//if(Utils.currentTimeSeconds() - started > BlackcoinMagic.blockTime)
+			removeAll();
 		serializeTofile(wholeMap);
 	}
 
@@ -249,27 +231,10 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 
 	@Override
 	public void put(StoredBlock storedBlock, StoredUndoableBlock undoableBlock) throws BlockStoreException {
-//		Sha256Hash hash = storedBlock.getHeader().getHash();
-//		if (!hash.equals(Sha256Hash.wrap(BlackcoinMagic.checkpoint0)))
-//			updatePrevWithNextBlock(storedBlock, undoableBlock);
-		
+	
 		insertOrUpdate(storedBlock, undoableBlock);
 		
 	}
-
-//	private void updatePrevWithNextBlock(StoredBlock storedBlock, StoredUndoableBlock undoableBlock)
-//			throws BlockStoreException {
-//		StoredBlock prevBlock = get(storedBlock.getHeader().getPrevBlockHash());
-//		if (Sha256Hash.ZERO_HASH.equals(prevBlock.getHeader().getNextBlockHash())
-//				|| prevBlock.getHeader().getNextBlockHash() == null) {
-//			Sha256Hash prevBlockHash = prevBlock.getHeader().getHash();
-//			byte[] byteBlock = wholeMap.get(new ByteArrayWrapper(prevBlockHash.getBytes()));
-//			BlackBlock blackBlock = new BlackBlock(params, byteBlock);
-//			blackBlock.block.getHeader().setNextBlockHash(storedBlock.getHeader().getHash());
-//			wholeMap.put(new ByteArrayWrapper(prevBlockHash.getBytes()), blackBlock.toByteArray());
-//		}
-//
-//	}
 
 	@Override
 	public StoredBlock getOnceUndoableStoredBlock(Sha256Hash hash) throws BlockStoreException {
@@ -345,16 +310,29 @@ public class KofemeFullPrunedBlockstore  implements FullPrunedBlockStore {
 		this.verifiedChainHead = chainHead;
 		setChainHead(chainHead);
 		wholeMap.put(new ByteArrayWrapper(VERIFIED_CHAINHEAD.getBytes()), chainHead.getHeader().getHash().getBytes());
-		if (this.theLast != null) {
-			removeAll();
-		}
 	}
 
 
 	private void removeAll() throws BlockStoreException {
-		byte[] byteBlock = wholeMap.get(new ByteArrayWrapper(this.theLast.getBytes()));
-		BlackBlock flagedBlock = new BlackBlock(params, byteBlock);
-		wholeMap.remove(this.theLast.getBytes());
+		log.info("removing all");
+		Set<ByteArrayWrapper> keysList = wholeMap.keySet();
+		int theHeight = chainHead.getHeight() - BlackcoinMagic.minimumStoreDepth;
+		for(ByteArrayWrapper key : keysList) {
+			byte[]output = wholeMap.get(key);
+			if(output[0] == 1){
+				try {
+					BlackBlock storedBlock = new BlackBlock(params, output);
+					if(storedBlock.block.getHeight() < theHeight)
+						wholeMap.remove(key);
+				} catch (BlockStoreException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+								
+			}else{
+				continue;
+			}
+		}
 	}
 
 

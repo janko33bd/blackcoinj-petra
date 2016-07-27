@@ -602,15 +602,25 @@ public class Transaction extends ChildMessage implements Serializable {
     public boolean isCoinBase() {
         maybeParse();
         return inputs.size() == 1 && inputs.get(0).isCoinBase();
+        		
+    }
+    
+    public boolean isCoinStake() {
+        maybeParse();
+        return inputs.size() > 0 && (!inputs.get(0).isCoinBase()) && outputs.size() >= 2 && outputs.get(0).isNull();
+        		
     }
 
     /**
      * A transaction is mature if it is either a building coinbase tx that is as deep or deeper than the required coinbase depth, or a non-coinbase tx.
      */
     public boolean isMature() {
+    	if (isCoinStake())
+        	return getConfidence().getDepthInBlocks() >= params.getSpendableCoinbaseDepth();
+    	
         if (!isCoinBase())
             return true;
-
+       
         if (getConfidence().getConfidenceType() != ConfidenceType.BUILDING)
             return false;
 
