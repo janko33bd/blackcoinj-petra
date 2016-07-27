@@ -452,4 +452,8 @@ public class TransactionOutput extends ChildMessage implements Serializable {
 		 maybeParse();
 		 return value == -1;
 	}
+
+	public boolean isEmpty() {
+		return (value == 0l && scriptLen == 0);
+	}
 }

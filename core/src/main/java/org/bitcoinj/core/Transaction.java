@@ -607,7 +607,9 @@ public class Transaction extends ChildMessage implements Serializable {
     
     public boolean isCoinStake() {
         maybeParse();
-        return inputs.size() > 0 && (!inputs.get(0).isCoinBase()) && outputs.size() >= 2 && outputs.get(0).isNull();
+        return(inputs.size() > 0 && (!inputs.get(0).getOutpoint().isNull())
+        		&& outputs.size() >=2 && outputs.get(0).isEmpty());
+        //return inputs.size() > 0 && (!inputs.get(0).isCoinBase()) && outputs.size() >= 2 && outputs.get(0).isNull();
         		
     }
 
