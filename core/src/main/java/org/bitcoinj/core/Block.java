@@ -106,7 +106,6 @@ public class Block extends Message {
     // MAX_BLOCK_SIZE must be compared to the optimal encoding, not the actual encoding, so when parsing, we keep track
     // of the size of the ideal encoding in addition to the actual message size (which Message needs)
     private transient int optimalEncodingMessageSize;
-	private boolean mine;
 
     /** Special case constructor, used for the genesis node, cloneAsHeader and unit tests. */
     Block(NetworkParameters params) {
@@ -164,7 +163,6 @@ public class Block extends Message {
         this.nonce = nonce;
         this.transactions = new LinkedList<Transaction>();
         this.transactions.addAll(transactions);
-        this.mine = false;
     }
 
     public Block(NetworkParameters params, long version, Sha256Hash prevBlockHash, long time, long difficultyTarget) {
@@ -1171,13 +1169,5 @@ public class Block extends Message {
 
 	public void setSignature(byte[] signature) {
 		this.signature = signature;
-	}
-
-	public void setMine(boolean mine) {
-		this.mine= mine;		
-	}
-	
-	public boolean isMine() {
-		return this.mine;		
 	}
 }

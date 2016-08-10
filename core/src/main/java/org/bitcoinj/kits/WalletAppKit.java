@@ -22,7 +22,6 @@ import com.google.common.util.concurrent.*;
 import com.subgraph.orchid.*;
 import org.bitcoinj.core.*;
 import org.bitcoinj.net.discovery.*;
-import org.bitcoinj.params.*;
 import org.bitcoinj.protocols.channels.*;
 import org.bitcoinj.store.*;
 import org.bitcoinj.wallet.*;

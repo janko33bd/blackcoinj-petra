@@ -60,7 +60,7 @@ public class BlackcoinPOS {
 		// First try finding the previous transaction in database
 		UTXO txPrev = blockStore.getTransactionOutput(txin.getOutpoint().getHash(), txin.getOutpoint().getIndex());
 		if (txPrev == null)
-			throw new BlockStoreException("utxo not found");
+			throw new VerificationException("utxo not found");
 		// CheckStakeKernelHash(pindexPrev, nBits, block, txindex.pos.nTxPos -
 		// txindex.pos.nBlockPos, txPrev,
 		// txin.prevout, tx.nTime, hashProofOfStake, targetProofOfStake,

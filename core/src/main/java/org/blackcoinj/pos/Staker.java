@@ -25,7 +25,6 @@ import org.bitcoinj.core.PeerGroup;
 import org.bitcoinj.core.PrunedException;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
-import org.bitcoinj.core.StoredUndoableBlock;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.core.TransactionInput;
@@ -88,34 +87,7 @@ public class Staker extends AbstractExecutionThreadService {
 		@Override
 		public void reorganize(StoredBlock splitPoint, List<StoredBlock> oldBlocks, List<StoredBlock> newBlocks)
 				throws VerificationException {
-			log.info("reorg");			
-			try {
-				ifMineAddUtxo(oldBlocks);
-			} catch (BlockStoreException e) {
-				throw new VerificationException(e);
-			}
 			newBestBlockArrived = true;
-		}
-
-		private void ifMineAddUtxo(List<StoredBlock> oldBlocks) throws BlockStoreException {
-			for (StoredBlock block : oldBlocks) {
-				log.info("old block " + block.getHeader().getHashAsString());
-				log.info("mine? " + block.getHeader().isMine());
-				for(Sha256Hash hash: stakedOuts.keySet()){
-					log.info(hash.toString());
-				}
-				if (block.getHeader().isMine() || stakedOuts.get(block.getHeader().getHash()) != null ) {
-					log.info("is mine restoring.. ");
-					RestoreUTXOut utxoOut = getStakedUtxoOut(block.getHeader().getHash());
-					wallet.restoreOuts(utxoOut.getCoinstakeTx(), utxoOut.getOut());
-					store.addUnspentTransactionOutput(utxoOut.getUtxo());
-					stakedOuts.remove(block.getHeader().getHash());
-				}
-			}
-		}
-
-		private RestoreUTXOut getStakedUtxoOut(Sha256Hash hash) {
-			return stakedOuts.get(hash);
 		}
 
 	}
@@ -300,9 +272,6 @@ public class Staker extends AbstractExecutionThreadService {
 				log.info("broadcasting: " + newBlock.getHash());
 				peers.broadcastMinedBlock(newBlock);
 				
-				log.info("isMine: " + newBlock.isMine());
-				newBlock.setMine(true);
-				log.info("isMine: " + newBlock.isMine());
 				TransactionOutPoint prevoutStake = candidate.getOutPointFor();
 				UTXO stakedUTXO = store.getTransactionOutput(prevoutStake.getHash(), prevoutStake.getIndex());				
 				RestoreUTXOut utxoOut = new RestoreUTXOut(stakedUTXO, candidate, coinstakeTx);

@@ -4,8 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -33,7 +31,6 @@ public class H2MVStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 	private StoredBlock chainHead;
 	private NetworkParameters params;
 	private StoredBlock verifiedChainHead;
-	private Sha256Hash theLast;
 	private final long started;
 
 	private final String CHAINHEAD = "CHAINHEAD";
@@ -45,7 +42,6 @@ public class H2MVStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 		store.setReuseSpace(true);
 		store.setStoreVersion(0);
 		wholeMap = store.openMap("ALL");
-		
 		initStore();
 		started = Utils.currentTimeSeconds();
 	}
