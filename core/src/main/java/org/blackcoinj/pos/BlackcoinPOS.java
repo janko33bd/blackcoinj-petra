@@ -5,8 +5,6 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.bitcoinj.core.Block;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.StoredBlock;
@@ -21,7 +19,6 @@ import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.FullPrunedBlockStore;
 
 public class BlackcoinPOS {
-	private static final Logger log = LoggerFactory.getLogger(BlackcoinPOS.class);
 	private FullPrunedBlockStore blockStore;
 
 	public BlackcoinPOS(FullPrunedBlockStore blockStore) {
@@ -33,8 +30,6 @@ public class BlackcoinPOS {
 	}
 
 	private Sha256Hash checkSetBlackCoinPOS(StoredBlock storedPrev, Block block) throws BlockStoreException, VerificationException {
-
-		// log.info("checkinng proof of stake");
 		List<Transaction> transactions = block.getTransactions();
 		// CheckProofOfStake(pindexPrev, vtx[1], nBits, hashProof,
 		// targetProofOfStake
@@ -43,10 +38,6 @@ public class BlackcoinPOS {
 			throw new VerificationException("The proof-of-stake failed");
 		} else {
 			return stakeKernelHash;
-
-			// log.info("setting stake proof on height " +
-			// newBlock.getHeight());
-			// log.info("stake proof=" + stakeKernelHash);
 		}
 
 	}
@@ -79,14 +70,10 @@ public class BlackcoinPOS {
 		if (stakeTxTime < txPrev.getTxTime())
 			throw new VerificationException("Time violation");
 		// https://github.com/rat4/blackcoin/blob/e1b26651752c2a90e8cc42005e27bae7e1544622/src/kernel.cpp#L435
-		if (stakeTxTime > BlackcoinMagic.txTimeProtocolV3) {
-			int nDepth = 0;
-			
-
-		} else {
+		if (stakeTxTime <= BlackcoinMagic.txTimeProtocolV3) {
 			throw new VerificationException("Wrong chain!");
 		}
-
+		
 		// Base target
 		UTXO prevOut = blockStore.getTransactionOutput(txPrev.getHash(), prevout.getIndex());
 		// Weighted target
@@ -119,7 +106,7 @@ public class BlackcoinPOS {
 			hashProofOfStake = Sha256Hash.wrapReversed(Sha256Hash.hashTwice(ssStakeStream.toByteArray()));
 
 		} catch (IOException e) {
-			throw new VerificationException("creating hash in checkStakeKernelHashV2 failed");
+			throw new VerificationException("creating hash in checkStakeKernelHashV2 failed ", e);
 		}
 
 		BigInteger bigNumHashProofOfStake = hashProofOfStake.toBigInteger();

@@ -536,6 +536,18 @@ public class FullPrunedBlockChain extends AbstractBlockChain {
     
     @Override
 	protected Sha256Hash checkAndSetPOS(StoredBlock storedPrev, Block block) throws BlockStoreException, VerificationException{
+		TransactionInput txin = block.getTransactions().get(1).getInputs().get(0);
+    	UTXO txPrev = blockStore.getTransactionOutput(txin.getOutpoint().getHash(), txin.getOutpoint().getIndex());
+    	if(txPrev == null){
+    		try {
+    			StoredBlock storedPrevPrev = storedPrev.getPrev(blockStore);
+    			handleNewBestChain(storedPrevPrev, storedPrev, null, false);
+    			return storedPrev.getHeader().getStakeHashProof();
+			} catch (PrunedException e) {
+				 throw new VerificationException("Can't move back", e);
+			}
+    	}
+    		
 		return blackPOS.checkAndSetPOS(storedPrev, block);
 	}
 }
