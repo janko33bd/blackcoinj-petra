@@ -13,12 +13,11 @@ import org.bitcoinj.core.StoredBlock;
 import org.bitcoinj.core.StoredUndoableBlock;
 import org.bitcoinj.core.UTXO;
 import org.bitcoinj.core.UTXOProviderException;
+import org.bitcoinj.core.Utils;
 import org.bitcoinj.store.BlockStoreException;
 import org.bitcoinj.store.FullPrunedBlockStore;
 import org.blackcoinj.pos.BlackcoinMagic;
 import org.fusesource.leveldbjni.JniDBFactory;
-import org.h2.mvstore.MVMap;
-import org.h2.mvstore.MVStore;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.Options;
@@ -31,10 +30,10 @@ public class LevelDBStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 	private StoredBlock chainHead;
 	private NetworkParameters params;
 	private StoredBlock verifiedChainHead;
-	private Sha256Hash theLast;
 
 	private final String VERIFIED_CHAINHEAD = "VERIFIED_CHAINHEAD";
-	private final String THE_LAST = "THE_LAST";
+	private final long started;
+	
 
 	public LevelDBStoreFullPrunedBlockstore(NetworkParameters params, String dbName) throws BlockStoreException {
 		this.params = params;
@@ -47,12 +46,6 @@ public class LevelDBStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 		}
 		
 		byte[] verifiedChainHeadbytes = store.get(VERIFIED_CHAINHEAD.getBytes());
-		byte[] lastBytes = store.get(THE_LAST.getBytes());
-		if (lastBytes != null) {
-			this.theLast = Sha256Hash.wrap(lastBytes);
-			log.info("setting to " + this.theLast.toString());
-		} else
-			log.info("not set");
 
 		if (verifiedChainHeadbytes != null) {
 			Sha256Hash hash = Sha256Hash.wrap(verifiedChainHeadbytes);
@@ -60,6 +53,8 @@ public class LevelDBStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 			this.chainHead = headBlock;
 			this.verifiedChainHead = headBlock;
 		}
+		
+		started = Utils.currentTimeSeconds();
 
 	}
 
@@ -108,6 +103,9 @@ public class LevelDBStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 
 	@Override
 	public void close() throws BlockStoreException {
+		if(Utils.currentTimeSeconds() - started > BlackcoinMagic.blockTime)
+			removeAll();
+
 		try {
 			store.close();
 		} catch (IOException e) {
@@ -167,25 +165,8 @@ public class LevelDBStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 
 	@Override
 	public void put(StoredBlock storedBlock, StoredUndoableBlock undoableBlock) throws BlockStoreException {
-		Sha256Hash hash = storedBlock.getHeader().getHash();
-		if (!hash.equals(Sha256Hash.wrap(BlackcoinMagic.checkpoint0)))
-			updatePrevWithNextBlock(storedBlock, undoableBlock);
 		
 		insertOrUpdate(storedBlock, undoableBlock);
-	}
-
-	private void updatePrevWithNextBlock(StoredBlock storedBlock, StoredUndoableBlock undoableBlock)
-			throws BlockStoreException {
-		StoredBlock prevBlock = get(storedBlock.getHeader().getPrevBlockHash());
-		if (Sha256Hash.ZERO_HASH.equals(prevBlock.getHeader().getNextBlockHash())
-				|| prevBlock.getHeader().getNextBlockHash() == null) {
-			Sha256Hash prevBlockHash = prevBlock.getHeader().getHash();
-			byte[] byteBlock = store.get(prevBlockHash.getBytes());
-			BlackBlock blackBlock = new BlackBlock(params, byteBlock);
-			blackBlock.block.getHeader().setNextBlockHash(storedBlock.getHeader().getHash());
-			store.put(prevBlockHash.getBytes(), blackBlock.toByteArray());
-		}
-
 	}
 
 	@Override
@@ -264,29 +245,40 @@ public class LevelDBStoreFullPrunedBlockstore implements FullPrunedBlockStore {
 		if (this.chainHead.getHeight() < chainHead.getHeight())
 			setChainHead(chainHead);
 		store.put(VERIFIED_CHAINHEAD.getBytes(), getChainHead().getHeader().getHash().getBytes());
-		if (this.theLast != null) {
-			removeAll();
-		}
-	}
-
-	@Override
-	public void setTheLast(Sha256Hash theLast) {
-		this.theLast = theLast;
-		store.put(THE_LAST.getBytes(), this.theLast.getBytes());
 	}
 
 	private void removeAll() throws BlockStoreException {
-		byte[] byteBlock = store.get(this.theLast.getBytes());
-		BlackBlock flagedBlock = new BlackBlock(params, byteBlock);
-		store.delete(this.theLast.getBytes());
-		setTheLast(flagedBlock.block.getHeader().getNextBlockHash());
-	}
-
-	@Override
-	public void putCheckPointed(StoredBlock block) throws BlockStoreException {
-		Sha256Hash hash = block.getHeader().getHash();
-		BlackBlock blackBlock = new BlackBlock(block, true, null, null);
-		store.put(hash.getBytes(), blackBlock.toByteArray());
+		log.info("removing all");
+		int theHeight = chainHead.getHeight() - BlackcoinMagic.minimumStoreDepth;
+		DBIterator iterator = store.iterator();
+		try {
+		  for(iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
+		    
+			  byte[] output = iterator.peekNext().getValue();
+			  byte[] key = iterator.peekNext().getKey();
+			  if(output[0] == 1){
+				  try {
+						BlackBlock storedBlock = new BlackBlock(params, output);
+						
+						if(storedBlock.block.getHeight() < theHeight)
+							store.delete(key);
+					} catch (BlockStoreException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}else{
+					continue;
+				}
+			}
+		} finally {
+		  // Make sure you close the iterator to avoid resource leaks.
+		  try {
+			iterator.close();
+		} catch (IOException e) {
+			throw new BlockStoreException(e);
+		}
+		}
+		
 	}
 
 	@Override

@@ -27,6 +27,7 @@ import org.bitcoinj.store.*;
 import org.bitcoinj.wallet.*;
 import org.blackcoinj.store.H2MVStoreFullPrunedBlockstore;
 import org.blackcoinj.store.KofemeFullPrunedBlockstore;
+import org.blackcoinj.store.LevelDBStoreFullPrunedBlockstore;
 import org.slf4j.*;
 
 import javax.annotation.*;
@@ -281,7 +282,7 @@ public class WalletAppKit extends AbstractIdleService {
             // Initiate Bitcoin network objects (block store, blockchain and peer group)
          // Initiate Bitcoin network objects (block store, blockchain and peer group)
             //vStore = new KofemeFullPrunedBlockstore(params, chainFile.getAbsolutePath());
-            vStore = new H2MVStoreFullPrunedBlockstore(params, chainFile.getAbsolutePath());
+            vStore = new LevelDBStoreFullPrunedBlockstore(params, chainFile.getAbsolutePath());
             //vStore = new MemoryFullPrunedBlockStore(params, 0);
             
             vChain = new FullPrunedBlockChain(params, vStore);
